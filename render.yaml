@@ -16,3 +16,5 @@ services:
         sync: false
       - key: CLIENT_URL
         sync: false
+      - key: N8N_QC_WEBHOOK_URL
+        value: https://n8n.srv1710717.hstgr.cloud/webhook/48fd30e2-86e0-4bc8-b483-a0f961d2d144
