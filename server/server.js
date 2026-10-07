@@ -84,10 +84,12 @@ app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/inventory", inventoryRoutes);
 
-// 6. SPA FALLBACK ROUTING
+// 6. SPA FALLBACK ROUTING (never swallow missing /api routes as HTML)
 if (process.env.NODE_ENV === "production" || process.env.PORT) {
-  // FIXED: Changed '*' to '*path' to support Express 5 / path-to-regexp parsing safely
-  app.get("*path", (req, res) => {
+  app.get("*path", (req, res, next) => {
+    if (req.path.startsWith("/api")) {
+      return next();
+    }
     res.sendFile(path.join(__dirname, "../client/dist", "index.html"));
   });
 } else {

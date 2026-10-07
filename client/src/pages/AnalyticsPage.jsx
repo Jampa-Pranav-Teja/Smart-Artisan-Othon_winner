@@ -28,8 +28,13 @@ export function AnalyticsPage() {
   });
 
   // Extract logged-in artisan context
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  const artisanId = userInfo?.user?._id || userInfo?.id || "anonymous_artisan";
+  let artisanId = "anonymous_artisan";
+  try {
+    const userInfo = JSON.parse(localStorage.getItem("userInfo") || "null");
+    artisanId = userInfo?.user?._id || userInfo?._id || userInfo?.id || "anonymous_artisan";
+  } catch {
+    artisanId = "anonymous_artisan";
+  }
 
   // Fetch performance report from server
   const fetchAnalytics = useCallback(async () => {
@@ -38,7 +43,17 @@ export function AnalyticsPage() {
       const response = await axios.get(`${API_BASE_URL}/insights`, {
         params: { artisanId, timeframe }
       });
-      setAnalytics(response.data);
+      const data = response.data;
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("Unexpected insights response");
+      }
+      setAnalytics({
+        revenue: Number(data.revenue) || 0,
+        soldCount: Number(data.soldCount) || 0,
+        growth: data.growth || "+0%",
+        progress: Number(data.progress) || 0,
+        topProducts: Array.isArray(data.topProducts) ? data.topProducts : [],
+      });
     } catch (error) {
       console.error("Error connecting to insights server:", error);
     } finally {
