@@ -24,9 +24,7 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-
-const N8N_QC_WEBHOOK_URL =
-  "https://n8n.srv1710717.hstgr.cloud/webhook-test/48fd30e2-86e0-4bc8-b483-a0f961d2d144";
+import { API_BASE } from "../api/config";
 
 export function QualityCheck() {
   const navigate = useNavigate();
@@ -73,102 +71,54 @@ export function QualityCheck() {
     return new Blob([ab], { type: mimeString });
   };
 
+  const toUiResult = (payload) => {
+    const numericalScoreVal = Math.min(
+      Math.max(Math.round(Number(payload.quality_score) || 5), 0),
+      10,
+    );
+
+    let statusColor = "green";
+    if (numericalScoreVal <= 4) statusColor = "orange";
+    else if (numericalScoreVal <= 7) statusColor = "blue";
+
+    return {
+      percentageValue: numericalScoreVal * 10,
+      displayScore: numericalScoreVal,
+      status: payload.quality_label || "Quality Assessed",
+      color: statusColor,
+      observations: Array.isArray(payload.observations)
+        ? payload.observations
+        : [],
+      improvementTips: Array.isArray(payload.improvement_tips)
+        ? payload.improvement_tips
+        : [],
+    };
+  };
+
   const runQualityCheck = async () => {
     if (!image) return alert("Please capture an image first!");
 
     setLoading(true);
+    setResult(null);
     try {
       const imageBlob = dataURItoBlob(image);
       const formData = new FormData();
       formData.append("image", imageBlob, "artisan-product-qc.jpg");
 
-      const response = await axios.post(N8N_QC_WEBHOOK_URL, formData, {
+      const response = await axios.post(`${API_BASE}/quality/check`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120000,
       });
 
-      const responseData = response.data;
-      console.log("Raw Response from n8n:", responseData); 
-
-      let textAnalysis = "";
-      let numericalScoreVal = 5; 
-
-      // FIXED PARSING ENGINE
-      if (Array.isArray(responseData) && responseData.length > 0) {
-        responseData.forEach((item) => {
-          if (!item) return;
-
-          // Dynamically check for either 'text' or 'output' keys
-          const rawValue = item.text || item.output;
-          if (!rawValue) return;
-
-          const currentStr = String(rawValue).trim();
-
-          // Check if the current value is a clean number
-          if (!isNaN(currentStr) && currentStr !== "") {
-            numericalScoreVal = parseInt(currentStr, 10);
-          } else {
-            textAnalysis = currentStr;
-          }
-        });
-      } else if (responseData) {
-        // Flat object fallback support
-        textAnalysis = responseData.text || responseData.output || "";
-        const fallbackScore = responseData.output || responseData.text;
-        if (fallbackScore && !isNaN(String(fallbackScore).trim())) {
-          numericalScoreVal = parseInt(String(fallbackScore).trim(), 10);
-        }
-      }
-
-      if (!textAnalysis) {
-        throw new Error(
-          "Could not parse textual output from n8n response structure.",
-        );
-      }
-
-      // Safeguard score between 1 and 10
-      if (isNaN(numericalScoreVal)) numericalScoreVal = 5;
-      const percentageRingValue = Math.min(
-        Math.max(numericalScoreVal * 10, 0),
-        100,
-      );
-
-      // Determine colors dynamically based on real parsed score
-      let statusText = "Excellent Quality";
-      let statusColor = "green";
-      if (numericalScoreVal <= 4) {
-        statusText = "Fair Finish";
-        statusColor = "orange";
-      } else if (numericalScoreVal <= 7) {
-        statusText = "Good Quality";
-        statusColor = "blue";
-      }
-
-      // Clean up layout presentation text lines
-      const dynamicTips = textAnalysis
-        .split("\n")
-        .map((line) => line.replace(/^[•\-\*\d\.\s]+/, "").trim())
-        .filter((line) => line.length > 0);
-
-      setResult({
-        percentageValue: percentageRingValue,
-        displayScore: numericalScoreVal,
-        status: statusText,
-        color: statusColor,
-        suggestions: dynamicTips.length > 0 ? dynamicTips : [textAnalysis],
-      });
+      console.log("Normalized QC response:", response.data);
+      setResult(toUiResult(response.data));
     } catch (error) {
-      console.error("Quality Check Processing Error Stack:", error);
-      alert("Error parsing dynamic data. Check browser console.");
-
-      setResult({
-        percentageValue: 70,
-        displayScore: 7,
-        status: "Good Quality",
-        color: "blue",
-        suggestions: [
-          "Fallback Mode: Check your browser developer tools console to see why the response failed to parse natively.",
-        ],
-      });
+      console.error("Quality Check error:", error);
+      const message =
+        error?.response?.data?.message ||
+        error.message ||
+        "Quality check failed.";
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -258,6 +208,8 @@ export function QualityCheck() {
 
       {result && (
         <Stack>
+          <Image src={image} radius="md" mah={220} fit="contain" />
+
           <Paper withBorder p="lg" radius="lg" shadow="sm">
             <Group justify="center">
               <RingProgress
@@ -270,40 +222,57 @@ export function QualityCheck() {
                 label={
                   <Text ta="center" fw={900} size="xl">
                     {result.displayScore}
+                    <Text span size="xs" c="dimmed" display="block">
+                      /10
+                    </Text>
                   </Text>
                 }
               />
-              <Stack gap={0}>
+              <Stack gap={4}>
                 <Text fw={700} size="lg">
                   Quality Score
                 </Text>
-                <Badge color={result.color} variant="light">
+                <Badge color={result.color} variant="light" size="lg">
                   {result.status}
                 </Badge>
               </Stack>
             </Group>
           </Paper>
 
-          <Paper withBorder p="lg" radius="lg" bg="var(--mantine-color-gray-0)">
-            <Group mb="md">
-              <IconBulb color="orange" />
-              <Text fw={700}>AI Observations & Tips</Text>
-            </Group>
-            <List
-              spacing="sm"
-              size="sm"
-              center
-              icon={
-                <ThemeIcon color={result.color} size={20} radius="xl">
-                  <IconCircleCheck size={12} />
+          {result.observations?.length > 0 && (
+            <Paper withBorder p="lg" radius="lg" bg="var(--mantine-color-gray-0)">
+              <Group mb="md">
+                <ThemeIcon color={result.color} variant="light" radius="xl">
+                  <IconCircleCheck size={16} />
                 </ThemeIcon>
-              }
+                <Text fw={700}>Observations</Text>
+              </Group>
+              <List spacing="sm" size="sm">
+                {result.observations.map((item, i) => (
+                  <List.Item key={`obs-${i}`}>{item}</List.Item>
+                ))}
+              </List>
+            </Paper>
+          )}
+
+          {result.improvementTips?.length > 0 && (
+            <Paper
+              withBorder
+              p="lg"
+              radius="lg"
+              bg="var(--mantine-color-orange-0)"
             >
-              {result.suggestions.map((tip, i) => (
-                <List.Item key={i}>{tip}</List.Item>
-              ))}
-            </List>
-          </Paper>
+              <Group mb="md">
+                <IconBulb color="orange" />
+                <Text fw={700}>Improvement Tips</Text>
+              </Group>
+              <List spacing="sm" size="sm">
+                {result.improvementTips.map((tip, i) => (
+                  <List.Item key={`tip-${i}`}>{tip}</List.Item>
+                ))}
+              </List>
+            </Paper>
+          )}
 
           <Button
             fullWidth

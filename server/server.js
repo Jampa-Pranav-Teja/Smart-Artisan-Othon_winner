@@ -17,6 +17,7 @@ import settingsRoutes from "./routes/settingsRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
+import qualityRoutes from "./routes/qualityRoutes.js";
 
 // Middleware Imports
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
@@ -83,6 +84,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/quality", qualityRoutes);
 
 // 6. SPA FALLBACK ROUTING (never swallow missing /api routes as HTML)
 if (process.env.NODE_ENV === "production" || process.env.PORT) {
