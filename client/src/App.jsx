@@ -24,13 +24,23 @@ import { InventoryPage } from "./pages/InventoryPage";
 import { QualityCheck } from "./pages/QualityCheck";
 import { AnalyticsPage } from "./pages/AnalyticsPage"; 
 
+function readUserInfo() {
+  try {
+    const raw = localStorage.getItem("userInfo");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    localStorage.removeItem("userInfo");
+    return null;
+  }
+}
+
 function App() {
-  // Check login status
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("userInfo"));
-  
-  // Get user info to check role
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  const role = userInfo?.role;
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!readUserInfo());
+  const userInfo = readUserInfo();
+  // Default to artisan workspace when role is missing (older sessions)
+  const role = userInfo?.role || (isLoggedIn ? "artisan" : null);
 
   return (
     <BrowserRouter>

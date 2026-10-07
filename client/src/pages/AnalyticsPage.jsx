@@ -116,7 +116,7 @@ export function AnalyticsPage() {
                 <IconTrendingUp size={16} color="green" />
               </Group>
               <Text size="xs" c="dimmed" fw={700} tt="uppercase">Revenue</Text>
-              <Text size="xl" fw={900}>₹{analytics.revenue.toLocaleString("en-IN")}</Text>
+              <Text size="xl" fw={900}>₹{(Number(analytics.revenue) || 0).toLocaleString("en-IN")}</Text>
             </Paper>
 
             <Paper withBorder p="md" radius="lg" shadow="xs">
@@ -124,10 +124,10 @@ export function AnalyticsPage() {
                 <ThemeIcon color="blue" variant="light" size="lg" radius="md">
                   <IconPackage size={20} />
                 </ThemeIcon>
-                <Text size="xs" fw={700} c="green">{analytics.growth}</Text>
+                <Text size="xs" fw={700} c="green">{analytics.growth || "+0%"}</Text>
               </Group>
               <Text size="xs" c="dimmed" fw={700} tt="uppercase">Sold</Text>
-              <Text size="xl" fw={900}>{analytics.soldCount} units</Text>
+              <Text size="xl" fw={900}>{Number(analytics.soldCount) || 0} units</Text>
             </Paper>
           </SimpleGrid>
 
@@ -140,15 +140,13 @@ export function AnalyticsPage() {
             <Stack gap="xs">
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">Target Completion</Text>
-                <Text size="sm" fw={700} c="orange">{analytics.progress}%</Text>
+                <Text size="sm" fw={700} c="orange">{Number(analytics.progress) || 0}%</Text>
               </Group>
               <Progress 
-                value={analytics.progress} 
+                value={Number(analytics.progress) || 0} 
                 color="orange" 
                 size="xl" 
                 radius="xl" 
-                striped 
-                animated 
               />
             </Stack>
           </Paper>
@@ -157,11 +155,10 @@ export function AnalyticsPage() {
           <Paper withBorder p="lg" radius="lg" shadow="sm">
             <Title order={5} mb="md">Top Products ({timeframe})</Title>
             <Stack gap="xl">
-              {analytics.topProducts.length > 0 ? (
-                analytics.topProducts.map((product, i) => {
-                  // Normalize scale threshold against highest selling metric context
+              {(analytics.topProducts || []).length > 0 ? (
+                (analytics.topProducts || []).map((product, i) => {
                   const highestSales = analytics.topProducts[0]?.sales || 1;
-                  const itemPercentage = (product.sales / highestSales) * 100;
+                  const itemPercentage = ((Number(product.sales) || 0) / highestSales) * 100;
 
                   return (
                     <Stack key={i} gap={4}>
@@ -170,7 +167,7 @@ export function AnalyticsPage() {
                         <Text size="xs" fw={700} c="dimmed">{product.sales} units</Text>
                       </Group>
                       <Progress 
-                        value={itemPercentage} 
+                        value={Number.isFinite(itemPercentage) ? itemPercentage : 0} 
                         color={getProductColor(i)} 
                         size="md" 
                         radius="md" 
@@ -183,7 +180,6 @@ export function AnalyticsPage() {
               )}
             </Stack>
           </Paper>
-
           {/* AI INSIGHT */}
           <Paper p="md" radius="lg" bg="orange.0" style={{ border: '1px dashed orange' }}>
             <Text size="sm" c="orange.9" fw={600}>
