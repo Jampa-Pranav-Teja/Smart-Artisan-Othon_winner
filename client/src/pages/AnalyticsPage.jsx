@@ -9,7 +9,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api/reports";
+import { API_BASE } from "../api/config";
+
+const API_BASE_URL = `${API_BASE}/reports`;
 
 export function AnalyticsPage() {
   const navigate = useNavigate();

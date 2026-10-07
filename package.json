@@ -1,0 +1,15 @@
+{
+  "name": "smart-artisan-othon-winner",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Smart Artisan Assistant — Express API + Vite React client",
+  "scripts": {
+    "build": "cd client && npm install && npm run build && cd ../server && npm install",
+    "start": "cd server && npm start",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

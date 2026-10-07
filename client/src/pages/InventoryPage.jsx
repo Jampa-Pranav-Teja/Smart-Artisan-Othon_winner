@@ -10,7 +10,9 @@ import { useNavigate } from "react-router-dom";
 import { useDisclosure } from "@mantine/hooks";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api/inventory";
+import { API_BASE } from "../api/config";
+
+const API_BASE_URL = `${API_BASE}/inventory`;
 
 export function InventoryPage() {
   const navigate = useNavigate();

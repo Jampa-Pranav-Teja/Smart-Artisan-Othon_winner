@@ -10,8 +10,9 @@ import { useNavigate } from "react-router-dom";
 import { useDisclosure } from "@mantine/hooks";
 import axios from "axios";
 
-// Connected directly to your local Node/Express + MongoDB backend
-const API_BASE_URL = "http://localhost:5000/api/orders";
+import { API_BASE } from "../api/config";
+
+const API_BASE_URL = `${API_BASE}/orders`;
 
 export function MoneyFlow() {
   const navigate = useNavigate();
