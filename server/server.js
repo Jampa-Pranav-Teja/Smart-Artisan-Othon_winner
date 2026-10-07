@@ -36,7 +36,7 @@ const __dirname = path.dirname(__filename);
 // 1. CORS CONFIGURATION
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://smart-artisan-assistant-bn96.onrender.com",
+  "https://smart-artisan-assistant-7wwp.onrender.com",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
