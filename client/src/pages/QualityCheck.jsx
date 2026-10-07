@@ -26,7 +26,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const N8N_QC_WEBHOOK_URL =
-  "https://grouped-creatable-facial.ngrok-free.dev/webhook/b646e309-ae45-4460-a93e-cff13f6388bc";
+  "https://n8n.srv1710717.hstgr.cloud/webhook-test/48fd30e2-86e0-4bc8-b483-a0f961d2d144";
 
 export function QualityCheck() {
   const navigate = useNavigate();
