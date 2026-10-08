@@ -166,13 +166,18 @@ export function ArtisanSettings() {
         telegramChatId: chatId,
       });
 
-      alert(res.data?.message || "Telegram bot connected to n8n.");
+      const info = res.data?.webhookInfo;
+      const extra = info?.url ? `\n\nTelegram is sending updates to:\n${info.url}` : "";
+      alert((res.data?.message || "Telegram bot connected to n8n.") + extra);
     } catch (error) {
       console.error(error);
-      alert(
-        error?.response?.data?.message ||
-          "Could not connect the Telegram bot to n8n.",
-      );
+      const data = error?.response?.data;
+      const telegramError =
+        data?.webhookInfo?.last_error_message ||
+        data?.telegram?.description ||
+        data?.message ||
+        "Could not connect the Telegram bot to n8n.";
+      alert(telegramError);
     } finally {
       setConnecting(false);
     }

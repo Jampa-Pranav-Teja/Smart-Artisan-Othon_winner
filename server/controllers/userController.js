@@ -124,7 +124,15 @@ const updateUserProfile = async (req, res) => {
 };
 
 const DEFAULT_N8N_TELEGRAM_WEBHOOK =
-  "https://n8n.srv1710717.hstgr.cloud/webhook-test/c002b8f1-a120-48d0-b526-1aafabbb54a1";
+  "https://n8n.srv1710717.hstgr.cloud/webhook/c002b8f1-a120-48d0-b526-1aafabbb54a1";
+
+async function telegramApi(botToken, method, payload) {
+  return axios.post(
+    `https://api.telegram.org/bot${botToken}/${method}`,
+    payload || {},
+    { timeout: 20000, validateStatus: () => true },
+  );
+}
 
 /* CONNECT TELEGRAM BOT → n8n via Telegram setWebhook */
 const connectTelegramWebhook = async (req, res) => {
@@ -161,31 +169,50 @@ const connectTelegramWebhook = async (req, res) => {
     const n8nBase =
       process.env.N8N_TELEGRAM_WEBHOOK_URL || DEFAULT_N8N_TELEGRAM_WEBHOOK;
 
-    const n8nWebhookUrl = new URL(n8nBase);
+    const n8nWebhookUrl = new URL(n8nBase.replace("/webhook-test/", "/webhook/"));
     n8nWebhookUrl.searchParams.set("bot_token", botToken);
     n8nWebhookUrl.searchParams.set("artisan_id", artisanId);
 
-    const telegramResponse = await axios.post(
-      `https://api.telegram.org/bot${botToken}/setWebhook`,
-      { url: n8nWebhookUrl.toString() },
-      { timeout: 20000, validateStatus: () => true },
-    );
+    // Clear any previous webhook, then register the n8n production URL.
+    await telegramApi(botToken, "deleteWebhook", {
+      drop_pending_updates: true,
+    });
+
+    const telegramResponse = await telegramApi(botToken, "setWebhook", {
+      url: n8nWebhookUrl.toString(),
+      drop_pending_updates: true,
+      allowed_updates: ["message", "edited_message", "callback_query"],
+    });
+
+    const infoResponse = await telegramApi(botToken, "getWebhookInfo");
+    const webhookInfo = infoResponse.data?.result || {};
 
     if (!telegramResponse.data?.ok) {
       return res.status(502).json({
         message:
           telegramResponse.data?.description ||
-          "Telegram rejected the webhook. Check the bot token.",
+          webhookInfo.last_error_message ||
+          "Telegram rejected the webhook. Activate the n8n workflow, then try again.",
         telegram: telegramResponse.data,
+        webhookInfo,
+      });
+    }
+
+    if (webhookInfo.last_error_message) {
+      return res.status(502).json({
+        message: `Webhook set, but Telegram reported: ${webhookInfo.last_error_message}. Turn the n8n workflow Active (production URL, not test).`,
+        webhookUrl: n8nWebhookUrl.toString(),
+        webhookInfo,
       });
     }
 
     return res.json({
       success: true,
-      message: "Telegram bot connected to n8n.",
+      message: "Telegram bot connected. Send the bot a message to test.",
       artisanId,
       webhookUrl: n8nWebhookUrl.toString(),
       telegram: telegramResponse.data,
+      webhookInfo,
     });
   } catch (error) {
     console.error("Telegram setWebhook error:", error.message);
