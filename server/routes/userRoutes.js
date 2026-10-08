@@ -5,6 +5,7 @@ import {
   loginUser,
   getUserProfile,
   updateUserProfile,
+  connectTelegramWebhook,
 } from "../controllers/userController.js";
 
 import { protect } from "../middlewares/authMiddleware.js";
@@ -45,6 +46,12 @@ router.put(
   "/profile",
   protect,
   updateUserProfile
+);
+
+router.post(
+  "/telegram/connect",
+  protect,
+  connectTelegramWebhook
 );
 
 export default router;

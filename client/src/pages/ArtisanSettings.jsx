@@ -16,10 +16,10 @@ import {
   IconBrandTelegram,
   IconDeviceFloppy,
   IconInfoCircle,
+  IconPlugConnected,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { API_BASE } from "../api/config";
+import API from "../api/axios";
 
 function readUserInfo() {
   try {
@@ -34,6 +34,7 @@ export function ArtisanSettings() {
   const [telegramBotToken, setTelegramBotToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [userInfo, setUserInfo] = useState(() => readUserInfo());
 
@@ -50,9 +51,7 @@ export function ArtisanSettings() {
       setTelegramChatId(stored.telegramChatId || "");
 
       try {
-        const res = await axios.get(`${API_BASE}/users/profile`, {
-          headers: { Authorization: `Bearer ${stored.token}` },
-        });
+        const res = await API.get("/users/profile");
 
         const tokenValue =
           res.data?.telegramBotToken ?? stored.telegramBotToken ?? "";
@@ -110,14 +109,10 @@ export function ArtisanSettings() {
 
     setLoading(true);
     try {
-      const res = await axios.put(
-        `${API_BASE}/users/profile`,
-        {
-          telegramBotToken: token,
-          telegramChatId: chatId,
-        },
-        { headers: { Authorization: `Bearer ${userInfo.token}` } },
-      );
+      const res = await API.put("/users/profile", {
+        telegramBotToken: token,
+        telegramChatId: chatId,
+      });
 
       const savedToken = res.data?.telegramBotToken || token;
       const savedChatId = res.data?.telegramChatId || chatId;
@@ -140,6 +135,46 @@ export function ArtisanSettings() {
       alert(error?.response?.data?.message || "Update failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConnectN8n = async () => {
+    const token = telegramBotToken.trim();
+    const chatId = telegramChatId.trim();
+
+    if (!token) {
+      alert("Please paste your Telegram bot access token first.");
+      return;
+    }
+
+    if (!/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
+      alert(
+        "That doesn’t look like a Telegram bot token. Get one from @BotFather (format: 123456:ABC...).",
+      );
+      return;
+    }
+
+    if (!userInfo?.token) {
+      alert("Please log in again");
+      return;
+    }
+
+    setConnecting(true);
+    try {
+      const res = await API.post("/users/telegram/connect", {
+        telegramBotToken: token,
+        telegramChatId: chatId,
+      });
+
+      alert(res.data?.message || "Telegram bot connected to n8n.");
+    } catch (error) {
+      console.error(error);
+      alert(
+        error?.response?.data?.message ||
+          "Could not connect the Telegram bot to n8n.",
+      );
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -213,6 +248,19 @@ export function ArtisanSettings() {
               onClick={handleSave}
             >
               Save Telegram Settings
+            </Button>
+
+            <Button
+              fullWidth
+              variant="light"
+              color="blue"
+              size="lg"
+              radius="md"
+              loading={connecting || loadingProfile}
+              leftSection={<IconPlugConnected size={20} />}
+              onClick={handleConnectN8n}
+            >
+              Connect Bot to n8n
             </Button>
           </Stack>
         </Paper>

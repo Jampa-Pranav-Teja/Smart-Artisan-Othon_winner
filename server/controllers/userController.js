@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
+import axios from "axios";
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -122,4 +123,82 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-export { registerUser, loginUser, getUserProfile, updateUserProfile };
+const DEFAULT_N8N_TELEGRAM_WEBHOOK =
+  "https://n8n.srv1710717.hstgr.cloud/webhook-test/c002b8f1-a120-48d0-b526-1aafabbb54a1";
+
+/* CONNECT TELEGRAM BOT → n8n via Telegram setWebhook */
+const connectTelegramWebhook = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id || req.user.id || req.user);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const botToken = (
+      req.body.telegramBotToken ||
+      user.telegramBotToken ||
+      ""
+    ).trim();
+
+    if (!botToken) {
+      return res.status(400).json({
+        message: "Save your Telegram bot access token first.",
+      });
+    }
+
+    if (typeof req.body.telegramBotToken === "string") {
+      user.telegramBotToken = botToken;
+    }
+    if (typeof req.body.telegramChatId === "string") {
+      user.telegramChatId = req.body.telegramChatId.trim();
+    }
+    if (user.isModified()) {
+      await user.save();
+    }
+
+    const artisanId = String(user._id);
+    const n8nBase =
+      process.env.N8N_TELEGRAM_WEBHOOK_URL || DEFAULT_N8N_TELEGRAM_WEBHOOK;
+
+    const n8nWebhookUrl = new URL(n8nBase);
+    n8nWebhookUrl.searchParams.set("bot_token", botToken);
+    n8nWebhookUrl.searchParams.set("artisan_id", artisanId);
+
+    const telegramResponse = await axios.post(
+      `https://api.telegram.org/bot${botToken}/setWebhook`,
+      { url: n8nWebhookUrl.toString() },
+      { timeout: 20000, validateStatus: () => true },
+    );
+
+    if (!telegramResponse.data?.ok) {
+      return res.status(502).json({
+        message:
+          telegramResponse.data?.description ||
+          "Telegram rejected the webhook. Check the bot token.",
+        telegram: telegramResponse.data,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Telegram bot connected to n8n.",
+      artisanId,
+      webhookUrl: n8nWebhookUrl.toString(),
+      telegram: telegramResponse.data,
+    });
+  } catch (error) {
+    console.error("Telegram setWebhook error:", error.message);
+    return res.status(500).json({
+      message: error.message || "Failed to connect Telegram bot.",
+    });
+  }
+};
+
+export {
+  registerUser,
+  loginUser,
+  getUserProfile,
+  updateUserProfile,
+  connectTelegramWebhook,
+};
