@@ -29,6 +29,7 @@ export const googleAuth = asyncHandler(async (req, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    telegramBotToken: user.telegramBotToken || "",
     token: generateToken(user._id),
   });
 });

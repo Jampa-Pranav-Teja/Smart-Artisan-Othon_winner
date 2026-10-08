@@ -53,6 +53,7 @@ const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        telegramBotToken: user.telegramBotToken || "",
         token: generateToken(user._id),
       });
     } else {
@@ -66,7 +67,7 @@ const loginUser = async (req, res) => {
 /* GET PROFILE */
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user).select("-password");
+    const user = await User.findById(req.user._id || req.user).select("-password");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -78,4 +79,41 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-export { registerUser, loginUser, getUserProfile };
+/* UPDATE PROFILE */
+const updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id || req.user);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (typeof req.body.telegramBotToken === "string") {
+      user.telegramBotToken = req.body.telegramBotToken.trim();
+    }
+
+    if (typeof req.body.name === "string" && req.body.name.trim()) {
+      user.name = req.body.name.trim();
+    }
+
+    if (typeof req.body.profession === "string") {
+      user.profession = req.body.profession.trim();
+    }
+
+    const updated = await user.save();
+
+    res.json({
+      _id: updated._id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      profession: updated.profession,
+      telegramBotToken: updated.telegramBotToken || "",
+      token: generateToken(updated._id),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export { registerUser, loginUser, getUserProfile, updateUserProfile };

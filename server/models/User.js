@@ -40,6 +40,13 @@ const userSchema = mongoose.Schema(
       type: String,
       default: "Artisan",
     },
+
+    // Telegram bot token for artisan alerts via n8n
+    telegramBotToken: {
+      type: String,
+      default: "",
+      trim: true,
+    },
   },
   {
     timestamps: true,

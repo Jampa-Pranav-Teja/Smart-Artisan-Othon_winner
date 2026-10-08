@@ -1,48 +1,107 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Container, TextInput, Button, Title, Paper, Group, 
-  ActionIcon, Stack, Text, Divider, Alert 
+import {
+  Container,
+  TextInput,
+  Button,
+  Title,
+  Paper,
+  Group,
+  ActionIcon,
+  Stack,
+  Text,
+  Alert,
+  PasswordInput,
 } from "@mantine/core";
-import { 
-  IconArrowLeft, IconBrandWhatsapp, IconDeviceFloppy, IconInfoCircle 
+import {
+  IconArrowLeft,
+  IconBrandTelegram,
+  IconDeviceFloppy,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API_BASE } from "../api/config";
+
+function readUserInfo() {
+  try {
+    return JSON.parse(localStorage.getItem("userInfo") || "null");
+  } catch {
+    return null;
+  }
+}
 
 export function ArtisanSettings() {
   const navigate = useNavigate();
-  const [phone, setPhone] = useState("");
+  const [telegramBotToken, setTelegramBotToken] = useState("");
   const [loading, setLoading] = useState(false);
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const [userInfo, setUserInfo] = useState(() => readUserInfo());
 
   useEffect(() => {
-    if (userInfo?.phoneNumber) {
-      setPhone(userInfo.phoneNumber.replace("+91", ""));
-    }
+    const loadProfile = async () => {
+      const stored = readUserInfo();
+      if (!stored?.token) return;
+
+      if (stored.telegramBotToken) {
+        setTelegramBotToken(stored.telegramBotToken);
+      }
+
+      try {
+        const res = await axios.get(`${API_BASE}/users/profile`, {
+          headers: { Authorization: `Bearer ${stored.token}` },
+        });
+        const tokenValue = res.data?.telegramBotToken || "";
+        setTelegramBotToken(tokenValue);
+        const merged = { ...stored, ...res.data, token: stored.token };
+        localStorage.setItem("userInfo", JSON.stringify(merged));
+        setUserInfo(merged);
+      } catch (error) {
+        console.error("Failed to load profile:", error);
+      }
+    };
+
+    loadProfile();
   }, []);
 
   const handleSave = async () => {
-    if (phone.length !== 10) {
-      alert("Please enter a valid 10-digit number");
+    const token = telegramBotToken.trim();
+    if (!token) {
+      alert("Please paste your Telegram bot access token");
+      return;
+    }
+
+    // BotFather tokens look like: 123456:ABC-DEF...
+    if (!/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
+      alert(
+        "That doesn’t look like a Telegram bot token. Get one from @BotFather (format: 123456:ABC...).",
+      );
+      return;
+    }
+
+    if (!userInfo?.token) {
+      alert("Please log in again");
       return;
     }
 
     setLoading(true);
     try {
-      const fullPhone = `+91${phone}`;
-      // Update this URL to match your backend route
-      await axios.put(
-        "/api/users/profile",
-        { phoneNumber: fullPhone },
-        { headers: { Authorization: `Bearer ${userInfo.token}` } }
+      const res = await axios.put(
+        `${API_BASE}/users/profile`,
+        { telegramBotToken: token },
+        { headers: { Authorization: `Bearer ${userInfo.token}` } },
       );
 
-      const updatedUser = { ...userInfo, phoneNumber: fullPhone };
+      const updatedUser = {
+        ...userInfo,
+        ...res.data,
+        token: res.data.token || userInfo.token,
+        telegramBotToken: res.data.telegramBotToken || token,
+      };
       localStorage.setItem("userInfo", JSON.stringify(updatedUser));
-      alert("WhatsApp Linked!");
+      setUserInfo(updatedUser);
+      alert("Telegram bot token saved! You’ll get alert updates on that bot.");
     } catch (error) {
       console.error(error);
-      alert("Update failed");
+      alert(error?.response?.data?.message || "Update failed");
     } finally {
       setLoading(false);
     }
@@ -51,45 +110,60 @@ export function ArtisanSettings() {
   return (
     <Container size="xs" py="xl">
       <Group mb="xl">
-        <ActionIcon variant="subtle" onClick={() => navigate("/")} color="gray" size="lg">
+        <ActionIcon
+          variant="subtle"
+          onClick={() => navigate("/")}
+          color="gray"
+          size="lg"
+        >
           <IconArrowLeft size={24} />
         </ActionIcon>
         <Title order={3}>Settings</Title>
       </Group>
 
       <Stack gap="md">
-        <Alert icon={<IconInfoCircle size={16} />} title="WhatsApp Automation" color="orange">
-          Text your updates to our bot. Use the 10-digit number you'll text from.
+        <Alert
+          icon={<IconInfoCircle size={16} />}
+          title="Telegram Alerts"
+          color="blue"
+        >
+          Paste the access token from{" "}
+          <Text span fw={700}>
+            @BotFather
+          </Text>
+          . Your artisan updates and alerts will be sent through this bot via
+          n8n automation.
         </Alert>
 
         <Paper withBorder p="xl" radius="lg" shadow="sm">
           <Stack gap="md">
             <Group gap="xs">
-              <IconBrandWhatsapp color="#25D366" />
-              <Text fw={600}>WhatsApp Connection</Text>
+              <IconBrandTelegram color="#229ED9" />
+              <Text fw={600}>Telegram Bot Connection</Text>
             </Group>
 
-            <TextInput
-              label="Phone Number"
-              placeholder="9876543210"
-              leftSection={<Text size="sm" fw={700} c="dimmed">+91</Text>}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            <PasswordInput
+              label="Bot Access Token"
+              description="From Telegram → @BotFather → your bot → API Token"
+              placeholder="123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+              value={telegramBotToken}
+              onChange={(e) => setTelegramBotToken(e.currentTarget.value.trim())}
               size="md"
               radius="md"
+              visibilityToggle
             />
 
-            <Button 
-              fullWidth 
-              color="orange" 
-              size="lg" 
-              mt="md" 
+            <Button
+              fullWidth
+              color="orange"
+              size="lg"
+              mt="md"
               radius="md"
               loading={loading}
               leftSection={<IconDeviceFloppy size={20} />}
               onClick={handleSave}
             >
-              Save Settings
+              Save Telegram Token
             </Button>
           </Stack>
         </Paper>
