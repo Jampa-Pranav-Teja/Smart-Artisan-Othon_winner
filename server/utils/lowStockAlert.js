@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const DEFAULT_LOW_STOCK_WEBHOOK =
-  "https://n8n.srv1710717.hstgr.cloud/webhook-test/f631dfff-17ac-4cf5-82a4-b05ff21b1aad";
+  "https://n8n.srv1710717.hstgr.cloud/webhook/f631dfff-17ac-4cf5-82a4-b05ff21b1aad";
 
 const LOW_STOCK_THRESHOLD = 0.2; // 20%
 

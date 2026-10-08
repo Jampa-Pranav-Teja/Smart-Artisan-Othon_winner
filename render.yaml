@@ -21,4 +21,4 @@ services:
       - key: N8N_PRICE_WEBHOOK_URL
         value: https://n8n.srv1710717.hstgr.cloud/webhook/4907eca7-65ca-41d2-a128-f345821b73ac
       - key: N8N_LOW_STOCK_WEBHOOK_URL
-        value: https://n8n.srv1710717.hstgr.cloud/webhook-test/f631dfff-17ac-4cf5-82a4-b05ff21b1aad
+        value: https://n8n.srv1710717.hstgr.cloud/webhook/f631dfff-17ac-4cf5-82a4-b05ff21b1aad
