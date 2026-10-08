@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
-import Inventory from "../models/Inventory.js"; // Importing the newly created layout model
+import Inventory from "../models/Inventory.js";
+import { maybeSendLowStockAlert } from "../utils/lowStockAlert.js";
 
 const router = express.Router();
 
@@ -23,6 +24,8 @@ router.post("/", async (req, res, next) => {
   try {
     const newItem = new Inventory(req.body);
     const savedItem = await newItem.save();
+    // Alert if created already below 20%
+    maybeSendLowStockAlert({ previousItem: null, updatedItem: savedItem });
     return res.status(201).json(savedItem);
   } catch (error) {
     next(error);
@@ -39,16 +42,23 @@ router.put("/:id/stock", async (req, res, next) => {
       return res.status(400).json({ message: "Invalid MongoDB Object ID configuration" });
     }
 
-    const updatedItem = await Inventory.findByIdAndUpdate(
+    const previousItem = await Inventory.findById(id).lean();
+    if (!previousItem) {
+      return res.status(404).json({ message: "Target inventory row not found" });
+    }
+
+    let updatedItem = await Inventory.findByIdAndUpdate(
       id,
       { $inc: { stock: amount } },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (updatedItem && updatedItem.stock < 0) {
       updatedItem.stock = 0;
       await updatedItem.save();
     }
+
+    maybeSendLowStockAlert({ previousItem, updatedItem });
 
     return res.json(updatedItem);
   } catch (error) {
@@ -64,15 +74,18 @@ router.put("/:id", async (req, res, next) => {
       return res.status(400).json({ message: "Invalid MongoDB Object ID configuration" });
     }
 
+    const previousItem = await Inventory.findById(id).lean();
+    if (!previousItem) {
+      return res.status(404).json({ message: "Target inventory row not found" });
+    }
+
     const updatedItem = await Inventory.findByIdAndUpdate(
       id,
       { $set: req.body },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
-    if (!updatedItem) {
-      return res.status(404).json({ message: "Target inventory row not found" });
-    }
+    maybeSendLowStockAlert({ previousItem, updatedItem });
 
     return res.json(updatedItem);
   } catch (error) {
