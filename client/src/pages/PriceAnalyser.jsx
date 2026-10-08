@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Container,
   Title,
@@ -28,37 +28,83 @@ export function PriceAnalyser() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const cameraDesiredRef = useRef(false);
 
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
 
+  const stopCamera = useCallback(() => {
+    cameraDesiredRef.current = false;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cameraDesiredRef.current = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraActive]);
+
+  // Always release camera once results are shown
+  useEffect(() => {
+    if (prediction) stopCamera();
+  }, [prediction, stopCamera]);
+
   const startCamera = async () => {
-    setCameraActive(true);
+    stopCamera();
     setPrediction(null);
+    setImage(null);
+    cameraDesiredRef.current = true;
+    setCameraActive(true);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
+
+      if (!cameraDesiredRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
       console.error("Camera access denied", err);
+      cameraDesiredRef.current = false;
+      setCameraActive(false);
       alert("Please allow camera access to use this feature.");
     }
   };
 
   const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
     const context = canvasRef.current.getContext("2d");
     context.drawImage(videoRef.current, 0, 0, 640, 480);
     setImage(canvasRef.current.toDataURL("image/jpeg"));
-
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-    }
-    setCameraActive(false);
+    stopCamera();
   };
 
   const dataURItoBlob = (dataURI) => {
@@ -75,6 +121,7 @@ export function PriceAnalyser() {
   const analyzePrice = async () => {
     if (!image) return alert("Please capture an image first!");
 
+    stopCamera();
     setLoading(true);
     setPrediction(null);
     try {
@@ -89,6 +136,7 @@ export function PriceAnalyser() {
 
       const data = response.data || {};
       const raw = data.raw || data;
+      stopCamera();
       setPrediction({
         classification:
           data.classification ||
@@ -113,6 +161,7 @@ export function PriceAnalyser() {
       });
     } catch (error) {
       console.error("n8n workflow connection error:", error);
+      stopCamera();
       alert(
         error?.response?.data?.message ||
           error.message ||
@@ -123,22 +172,29 @@ export function PriceAnalyser() {
     }
   };
 
+  const goBack = () => {
+    stopCamera();
+    navigate("/");
+  };
+
   return (
     <Container size="xs" py="xl">
       <Group mb="xl">
-        <ActionIcon
-          variant="subtle"
-          onClick={() => navigate("/")}
-          color="gray"
-          size="lg"
-        >
+        <ActionIcon variant="subtle" onClick={goBack} color="gray" size="lg">
           <IconArrowLeft size={24} />
         </ActionIcon>
         <Title order={3}>AI Price Analyser</Title>
       </Group>
 
+      <canvas
+        ref={canvasRef}
+        width="640"
+        height="480"
+        style={{ display: "none" }}
+      />
+
       <Stack gap="md">
-        {!image && !cameraActive && (
+        {!image && !cameraActive && !prediction && (
           <Paper
             withBorder
             p="xl"
@@ -163,6 +219,7 @@ export function PriceAnalyser() {
               ref={videoRef}
               autoPlay
               playsInline
+              muted
               style={{
                 width: "100%",
                 borderRadius: "12px",
@@ -178,12 +235,6 @@ export function PriceAnalyser() {
             >
               Capture Product
             </Button>
-            <canvas
-              ref={canvasRef}
-              width="640"
-              height="480"
-              style={{ display: "none" }}
-            />
           </Stack>
         )}
 
@@ -261,6 +312,7 @@ export function PriceAnalyser() {
                 variant="light"
                 color="orange"
                 onClick={() => {
+                  stopCamera();
                   setPrediction(null);
                   setImage(null);
                 }}

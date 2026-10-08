@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Container,
   Title,
@@ -30,34 +30,84 @@ export function QualityCheck() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const cameraDesiredRef = useRef(false);
 
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
 
+  const stopCamera = useCallback(() => {
+    cameraDesiredRef.current = false;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cameraDesiredRef.current = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
+  // Attach stream after <video> mounts
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraActive]);
+
+  // Always release camera once results are shown
+  useEffect(() => {
+    if (result) stopCamera();
+  }, [result, stopCamera]);
+
   const startCamera = async () => {
-    setCameraActive(true);
+    stopCamera();
     setResult(null);
+    setImage(null);
+    cameraDesiredRef.current = true;
+    setCameraActive(true);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
-      if (videoRef.current) videoRef.current.srcObject = stream;
+
+      // User already captured / left before permission resolved
+      if (!cameraDesiredRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
     } catch (err) {
+      cameraDesiredRef.current = false;
+      setCameraActive(false);
       alert("Camera access denied.");
     }
   };
 
   const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
     const context = canvasRef.current.getContext("2d");
     context.drawImage(videoRef.current, 0, 0, 640, 480);
     setImage(canvasRef.current.toDataURL("image/jpeg"));
-
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
-    }
-    setCameraActive(false);
+    stopCamera();
   };
 
   const dataURItoBlob = (dataURI) => {
@@ -98,6 +148,7 @@ export function QualityCheck() {
   const runQualityCheck = async () => {
     if (!image) return alert("Please capture an image first!");
 
+    stopCamera();
     setLoading(true);
     setResult(null);
     try {
@@ -110,10 +161,11 @@ export function QualityCheck() {
         timeout: 120000,
       });
 
-      console.log("Normalized QC response:", response.data);
+      stopCamera();
       setResult(toUiResult(response.data));
     } catch (error) {
       console.error("Quality Check error:", error);
+      stopCamera();
       const message =
         error?.response?.data?.message ||
         error.message ||
@@ -124,16 +176,29 @@ export function QualityCheck() {
     }
   };
 
+  const goBack = () => {
+    stopCamera();
+    navigate("/");
+  };
+
   return (
     <Container size="xs" py="xl">
       <Group mb="xl">
-        <ActionIcon variant="subtle" onClick={() => navigate("/")} color="gray">
+        <ActionIcon variant="subtle" onClick={goBack} color="gray">
           <IconArrowLeft size={24} />
         </ActionIcon>
         <Title order={3}>AI Quality Check</Title>
       </Group>
 
-      {!image && !cameraActive && (
+      {/* Keep canvas mounted so capture always works */}
+      <canvas
+        ref={canvasRef}
+        width="640"
+        height="480"
+        style={{ display: "none" }}
+      />
+
+      {!image && !cameraActive && !result && (
         <Paper
           withBorder
           p="xl"
@@ -158,6 +223,7 @@ export function QualityCheck() {
             ref={videoRef}
             autoPlay
             playsInline
+            muted
             style={{ width: "100%", borderRadius: "16px" }}
           />
           <Button
@@ -169,12 +235,6 @@ export function QualityCheck() {
           >
             Capture for Analysis
           </Button>
-          <canvas
-            ref={canvasRef}
-            width="640"
-            height="480"
-            style={{ display: "none" }}
-          />
         </Stack>
       )}
 
@@ -279,6 +339,7 @@ export function QualityCheck() {
             variant="light"
             color="orange"
             onClick={() => {
+              stopCamera();
               setResult(null);
               setImage(null);
             }}
