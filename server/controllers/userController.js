@@ -54,6 +54,7 @@ const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         telegramBotToken: user.telegramBotToken || "",
+        telegramChatId: user.telegramChatId || "",
         token: generateToken(user._id),
       });
     } else {
@@ -92,6 +93,10 @@ const updateUserProfile = async (req, res) => {
       user.telegramBotToken = req.body.telegramBotToken.trim();
     }
 
+    if (typeof req.body.telegramChatId === "string") {
+      user.telegramChatId = req.body.telegramChatId.trim();
+    }
+
     if (typeof req.body.name === "string" && req.body.name.trim()) {
       user.name = req.body.name.trim();
     }
@@ -109,6 +114,7 @@ const updateUserProfile = async (req, res) => {
       role: updated.role,
       profession: updated.profession,
       telegramBotToken: updated.telegramBotToken || "",
+      telegramChatId: updated.telegramChatId || "",
       token: generateToken(updated._id),
     });
   } catch (error) {

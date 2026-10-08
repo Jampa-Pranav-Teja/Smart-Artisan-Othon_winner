@@ -41,8 +41,13 @@ const userSchema = mongoose.Schema(
       default: "Artisan",
     },
 
-    // Telegram bot token for artisan alerts via n8n
+    // Telegram bot credentials for artisan alerts via n8n
     telegramBotToken: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    telegramChatId: {
       type: String,
       default: "",
       trim: true,

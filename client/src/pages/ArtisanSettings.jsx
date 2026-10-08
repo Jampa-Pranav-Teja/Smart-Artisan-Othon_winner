@@ -10,7 +10,6 @@ import {
   Stack,
   Text,
   Alert,
-  PasswordInput,
 } from "@mantine/core";
 import {
   IconArrowLeft,
@@ -33,29 +32,49 @@ function readUserInfo() {
 export function ArtisanSettings() {
   const navigate = useNavigate();
   const [telegramBotToken, setTelegramBotToken] = useState("");
+  const [telegramChatId, setTelegramChatId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [userInfo, setUserInfo] = useState(() => readUserInfo());
 
   useEffect(() => {
     const loadProfile = async () => {
       const stored = readUserInfo();
-      if (!stored?.token) return;
-
-      if (stored.telegramBotToken) {
-        setTelegramBotToken(stored.telegramBotToken);
+      if (!stored?.token) {
+        setLoadingProfile(false);
+        return;
       }
+
+      // Show cached values immediately so fields aren't blank while fetching
+      setTelegramBotToken(stored.telegramBotToken || "");
+      setTelegramChatId(stored.telegramChatId || "");
 
       try {
         const res = await axios.get(`${API_BASE}/users/profile`, {
           headers: { Authorization: `Bearer ${stored.token}` },
         });
-        const tokenValue = res.data?.telegramBotToken || "";
+
+        const tokenValue =
+          res.data?.telegramBotToken ?? stored.telegramBotToken ?? "";
+        const chatIdValue =
+          res.data?.telegramChatId ?? stored.telegramChatId ?? "";
+
         setTelegramBotToken(tokenValue);
-        const merged = { ...stored, ...res.data, token: stored.token };
+        setTelegramChatId(chatIdValue);
+
+        const merged = {
+          ...stored,
+          ...res.data,
+          token: stored.token, // keep JWT — don't overwrite with Mongo fields
+          telegramBotToken: tokenValue,
+          telegramChatId: chatIdValue,
+        };
         localStorage.setItem("userInfo", JSON.stringify(merged));
         setUserInfo(merged);
       } catch (error) {
         console.error("Failed to load profile:", error);
+      } finally {
+        setLoadingProfile(false);
       }
     };
 
@@ -64,8 +83,15 @@ export function ArtisanSettings() {
 
   const handleSave = async () => {
     const token = telegramBotToken.trim();
+    const chatId = telegramChatId.trim();
+
     if (!token) {
       alert("Please paste your Telegram bot access token");
+      return;
+    }
+
+    if (!chatId) {
+      alert("Please enter your Telegram Chat ID");
       return;
     }
 
@@ -86,19 +112,29 @@ export function ArtisanSettings() {
     try {
       const res = await axios.put(
         `${API_BASE}/users/profile`,
-        { telegramBotToken: token },
+        {
+          telegramBotToken: token,
+          telegramChatId: chatId,
+        },
         { headers: { Authorization: `Bearer ${userInfo.token}` } },
       );
+
+      const savedToken = res.data?.telegramBotToken || token;
+      const savedChatId = res.data?.telegramChatId || chatId;
+
+      setTelegramBotToken(savedToken);
+      setTelegramChatId(savedChatId);
 
       const updatedUser = {
         ...userInfo,
         ...res.data,
         token: res.data.token || userInfo.token,
-        telegramBotToken: res.data.telegramBotToken || token,
+        telegramBotToken: savedToken,
+        telegramChatId: savedChatId,
       };
       localStorage.setItem("userInfo", JSON.stringify(updatedUser));
       setUserInfo(updatedUser);
-      alert("Telegram bot token saved! You’ll get alert updates on that bot.");
+      alert("Telegram settings saved! Alerts will use this bot + chat.");
     } catch (error) {
       console.error(error);
       alert(error?.response?.data?.message || "Update failed");
@@ -127,12 +163,12 @@ export function ArtisanSettings() {
           title="Telegram Alerts"
           color="blue"
         >
-          Paste the access token from{" "}
+          Add your{" "}
           <Text span fw={700}>
             @BotFather
-          </Text>
-          . Your artisan updates and alerts will be sent through this bot via
-          n8n automation.
+          </Text>{" "}
+          access token and Chat ID. n8n will use both to send refill and update
+          alerts to your Telegram.
         </Alert>
 
         <Paper withBorder p="xl" radius="lg" shadow="sm">
@@ -142,15 +178,28 @@ export function ArtisanSettings() {
               <Text fw={600}>Telegram Bot Connection</Text>
             </Group>
 
-            <PasswordInput
+            <TextInput
               label="Bot Access Token"
               description="From Telegram → @BotFather → your bot → API Token"
               placeholder="123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
               value={telegramBotToken}
-              onChange={(e) => setTelegramBotToken(e.currentTarget.value.trim())}
+              onChange={(e) => setTelegramBotToken(e.currentTarget.value)}
               size="md"
               radius="md"
-              visibilityToggle
+              disabled={loadingProfile}
+              autoComplete="off"
+            />
+
+            <TextInput
+              label="Chat ID"
+              description="Your Telegram chat ID (from @userinfobot or getUpdates)"
+              placeholder="e.g. 123456789"
+              value={telegramChatId}
+              onChange={(e) => setTelegramChatId(e.currentTarget.value)}
+              size="md"
+              radius="md"
+              disabled={loadingProfile}
+              autoComplete="off"
             />
 
             <Button
@@ -159,11 +208,11 @@ export function ArtisanSettings() {
               size="lg"
               mt="md"
               radius="md"
-              loading={loading}
+              loading={loading || loadingProfile}
               leftSection={<IconDeviceFloppy size={20} />}
               onClick={handleSave}
             >
-              Save Telegram Token
+              Save Telegram Settings
             </Button>
           </Stack>
         </Paper>

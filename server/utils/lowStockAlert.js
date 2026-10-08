@@ -36,12 +36,14 @@ export async function maybeSendLowStockAlert({ previousItem, updatedItem }) {
       process.env.N8N_LOW_STOCK_WEBHOOK_URL || DEFAULT_LOW_STOCK_WEBHOOK;
 
     let telegramBotToken = "";
+    let telegramChatId = "";
     if (updatedItem.artisanId) {
       try {
         const user = await User.findById(updatedItem.artisanId)
-          .select("telegramBotToken name email")
+          .select("telegramBotToken telegramChatId name email")
           .lean();
         telegramBotToken = user?.telegramBotToken || "";
+        telegramChatId = user?.telegramChatId || "";
       } catch {
         /* artisanId may not always be a valid ObjectId in older data */
       }
@@ -55,6 +57,8 @@ export async function maybeSendLowStockAlert({ previousItem, updatedItem }) {
       message: `Refill needed: ${updatedItem.name} (${kind}) is at ${percent}% stock (${updatedItem.stock}/${updatedItem.maxStock} ${updatedItem.unit}). Please refill.`,
       artisanId: updatedItem.artisanId,
       telegramBotToken,
+      telegramChatId,
+
       item: {
         id: String(updatedItem._id),
         name: updatedItem.name,
