@@ -19,15 +19,18 @@ import {
   IconArrowLeft,
   IconScan,
   IconInfoCircle,
+  IconUpload,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../api/config";
+import { readImageFileAsDataUrl } from "../utils/readImageFile";
 
 export function PriceAnalyser() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
   const streamRef = useRef(null);
   const cameraDesiredRef = useRef(false);
 
@@ -105,6 +108,25 @@ export function PriceAnalyser() {
     context.drawImage(videoRef.current, 0, 0, 640, 480);
     setImage(canvasRef.current.toDataURL("image/jpeg"));
     stopCamera();
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      stopCamera();
+      setPrediction(null);
+      const dataUrl = await readImageFileAsDataUrl(file);
+      setImage(dataUrl);
+    } catch (error) {
+      alert(error.message || "Could not use that photo.");
+    }
   };
 
   const dataURItoBlob = (dataURI) => {
@@ -192,23 +214,42 @@ export function PriceAnalyser() {
         height="480"
         style={{ display: "none" }}
       />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileSelected}
+      />
 
       <Stack gap="md">
         {!image && !cameraActive && !prediction && (
-          <Paper
-            withBorder
-            p="xl"
-            radius="lg"
-            ta="center"
-            onClick={startCamera}
-            style={{ cursor: "pointer", borderStyle: "dashed" }}
-          >
+          <Paper withBorder p="xl" radius="lg" ta="center" style={{ borderStyle: "dashed" }}>
             <Stack align="center">
               <IconCamera size={50} color="gray" />
-              <Text fw={500}>Tap to scan your product</Text>
+              <Text fw={500}>Scan your product</Text>
               <Text size="xs" c="dimmed">
-                AI will suggest a competitive market price
+                Take a live photo or upload one from your device
               </Text>
+              <Group grow w="100%" mt="sm">
+                <Button
+                  color="orange"
+                  radius="md"
+                  onClick={startCamera}
+                  leftSection={<IconCamera size={18} />}
+                >
+                  Take Photo
+                </Button>
+                <Button
+                  variant="light"
+                  color="orange"
+                  radius="md"
+                  onClick={handleUploadClick}
+                  leftSection={<IconUpload size={18} />}
+                >
+                  Upload Photo
+                </Button>
+              </Group>
             </Stack>
           </Paper>
         )}
@@ -235,12 +276,18 @@ export function PriceAnalyser() {
             >
               Capture Product
             </Button>
+            <Button variant="subtle" color="gray" onClick={handleUploadClick}>
+              Upload instead
+            </Button>
           </Stack>
         )}
 
         {image && !loading && !prediction && (
           <Stack>
             <Image src={image} radius="md" />
+            <Button color="orange" onClick={analyzePrice}>
+              Analyse Price
+            </Button>
             <Group grow>
               <Button
                 variant="light"
@@ -252,8 +299,8 @@ export function PriceAnalyser() {
               >
                 Retake
               </Button>
-              <Button color="orange" onClick={analyzePrice}>
-                Analyse Price
+              <Button variant="light" color="orange" onClick={handleUploadClick}>
+                Upload another
               </Button>
             </Group>
           </Stack>

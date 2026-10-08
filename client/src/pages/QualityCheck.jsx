@@ -21,15 +21,18 @@ import {
   IconScan,
   IconCircleCheck,
   IconBulb,
+  IconUpload,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../api/config";
+import { readImageFileAsDataUrl } from "../utils/readImageFile";
 
 export function QualityCheck() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
   const streamRef = useRef(null);
   const cameraDesiredRef = useRef(false);
 
@@ -108,6 +111,25 @@ export function QualityCheck() {
     context.drawImage(videoRef.current, 0, 0, 640, 480);
     setImage(canvasRef.current.toDataURL("image/jpeg"));
     stopCamera();
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      stopCamera();
+      setResult(null);
+      const dataUrl = await readImageFileAsDataUrl(file);
+      setImage(dataUrl);
+    } catch (error) {
+      alert(error.message || "Could not use that photo.");
+    }
   };
 
   const dataURItoBlob = (dataURI) => {
@@ -197,22 +219,41 @@ export function QualityCheck() {
         height="480"
         style={{ display: "none" }}
       />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileSelected}
+      />
 
       {!image && !cameraActive && !result && (
-        <Paper
-          withBorder
-          p="xl"
-          radius="lg"
-          ta="center"
-          onClick={startCamera}
-          style={{ borderStyle: "dashed", cursor: "pointer" }}
-        >
+        <Paper withBorder p="xl" radius="lg" ta="center" style={{ borderStyle: "dashed" }}>
           <Stack align="center">
             <IconScan size={50} color="orange" />
             <Text fw={700}>Scan Product for Feedback</Text>
             <Text size="xs" c="dimmed">
-              AI will rate your finish and suggest improvements
+              Take a live photo or upload one from your device
             </Text>
+            <Group grow w="100%" mt="sm">
+              <Button
+                color="orange"
+                radius="md"
+                onClick={startCamera}
+                leftSection={<IconCamera size={18} />}
+              >
+                Take Photo
+              </Button>
+              <Button
+                variant="light"
+                color="orange"
+                radius="md"
+                onClick={handleUploadClick}
+                leftSection={<IconUpload size={18} />}
+              >
+                Upload Photo
+              </Button>
+            </Group>
           </Stack>
         </Paper>
       )}
@@ -235,6 +276,9 @@ export function QualityCheck() {
           >
             Capture for Analysis
           </Button>
+          <Button variant="subtle" color="gray" onClick={handleUploadClick}>
+            Upload instead
+          </Button>
         </Stack>
       )}
 
@@ -244,16 +288,21 @@ export function QualityCheck() {
           <Button color="orange" size="md" onClick={runQualityCheck}>
             Run AI Audit
           </Button>
-          <Button
-            variant="subtle"
-            color="gray"
-            onClick={() => {
-              setImage(null);
-              startCamera();
-            }}
-          >
-            Retake
-          </Button>
+          <Group grow>
+            <Button
+              variant="subtle"
+              color="gray"
+              onClick={() => {
+                setImage(null);
+                startCamera();
+              }}
+            >
+              Retake
+            </Button>
+            <Button variant="subtle" color="orange" onClick={handleUploadClick}>
+              Upload another
+            </Button>
+          </Group>
         </Stack>
       )}
 
