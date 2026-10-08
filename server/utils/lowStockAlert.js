@@ -1,4 +1,6 @@
 import axios from "axios";
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 const DEFAULT_LOW_STOCK_WEBHOOK =
@@ -17,11 +19,46 @@ export function isLowStock(item) {
   return getStockPercent(item) < LOW_STOCK_THRESHOLD;
 }
 
+async function resolveTelegramUser({ artisanId, authHeader }) {
+  // 1) Prefer logged-in user from Bearer token (fixes anonymous_artisan inventory rows)
+  if (authHeader?.startsWith("Bearer ") && process.env.JWT_SECRET) {
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded?.id) {
+        const user = await User.findById(decoded.id)
+          .select("telegramBotToken telegramChatId name email")
+          .lean();
+        if (user) return user;
+      }
+    } catch {
+      /* ignore invalid JWT */
+    }
+  }
+
+  // 2) Fall back to inventory artisanId when it is a real Mongo ObjectId
+  if (artisanId && mongoose.Types.ObjectId.isValid(artisanId)) {
+    try {
+      return await User.findById(artisanId)
+        .select("telegramBotToken telegramChatId name email")
+        .lean();
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Fire n8n refill alert when stock crosses below 20% of maxStock.
  * Non-blocking for the API response — failures are logged only.
  */
-export async function maybeSendLowStockAlert({ previousItem, updatedItem }) {
+export async function maybeSendLowStockAlert({
+  previousItem,
+  updatedItem,
+  authHeader,
+}) {
   try {
     if (!updatedItem) return;
 
@@ -35,19 +72,13 @@ export async function maybeSendLowStockAlert({ previousItem, updatedItem }) {
     const webhookUrl =
       process.env.N8N_LOW_STOCK_WEBHOOK_URL || DEFAULT_LOW_STOCK_WEBHOOK;
 
-    let telegramBotToken = "";
-    let telegramChatId = "";
-    if (updatedItem.artisanId) {
-      try {
-        const user = await User.findById(updatedItem.artisanId)
-          .select("telegramBotToken telegramChatId name email")
-          .lean();
-        telegramBotToken = user?.telegramBotToken || "";
-        telegramChatId = user?.telegramChatId || "";
-      } catch {
-        /* artisanId may not always be a valid ObjectId in older data */
-      }
-    }
+    const user = await resolveTelegramUser({
+      artisanId: updatedItem.artisanId,
+      authHeader,
+    });
+
+    const telegramBotToken = user?.telegramBotToken || "";
+    const telegramChatId = user?.telegramChatId || "";
 
     const kind =
       updatedItem.itemType === "material" ? "material" : "product/goods";
@@ -55,10 +86,13 @@ export async function maybeSendLowStockAlert({ previousItem, updatedItem }) {
     const payload = {
       alert_type: "low_stock",
       message: `Refill needed: ${updatedItem.name} (${kind}) is at ${percent}% stock (${updatedItem.stock}/${updatedItem.maxStock} ${updatedItem.unit}). Please refill.`,
-      artisanId: updatedItem.artisanId,
+      artisanId: user?._id
+        ? String(user._id)
+        : updatedItem.artisanId,
+      artisanName: user?.name || "",
+      artisanEmail: user?.email || "",
       telegramBotToken,
       telegramChatId,
-
       item: {
         id: String(updatedItem._id),
         name: updatedItem.name,
@@ -71,6 +105,13 @@ export async function maybeSendLowStockAlert({ previousItem, updatedItem }) {
       },
       triggeredAt: new Date().toISOString(),
     };
+
+    if (!telegramBotToken || !telegramChatId) {
+      console.warn(
+        "Low stock alert: missing Telegram credentials for artisan",
+        payload.artisanId,
+      );
+    }
 
     await axios.post(webhookUrl, payload, {
       timeout: 15000,

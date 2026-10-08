@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 import { API_BASE } from "../api/config";
+import { getArtisanId } from "../utils/artisanId";
 
 const API_BASE_URL = `${API_BASE}/reports`;
 
@@ -27,17 +28,11 @@ export function AnalyticsPage() {
     topProducts: []
   });
 
-  // Extract logged-in artisan context
-  let artisanId = "anonymous_artisan";
-  try {
-    const userInfo = JSON.parse(localStorage.getItem("userInfo") || "null");
-    artisanId = userInfo?.user?._id || userInfo?._id || userInfo?.id || "anonymous_artisan";
-  } catch {
-    artisanId = "anonymous_artisan";
-  }
+  const artisanId = getArtisanId();
 
   // Fetch performance report from server
   const fetchAnalytics = useCallback(async () => {
+    if (!artisanId) return;
     try {
       setLoading(true);
       const response = await axios.get(`${API_BASE_URL}/insights`, {

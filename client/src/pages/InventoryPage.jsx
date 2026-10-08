@@ -11,6 +11,7 @@ import { useDisclosure } from "@mantine/hooks";
 import axios from "axios";
 
 import { API_BASE } from "../api/config";
+import { getArtisanId } from "../utils/artisanId";
 
 const API_BASE_URL = `${API_BASE}/inventory`;
 
@@ -26,9 +27,7 @@ export function InventoryPage() {
   // Track if we are editing an item or creating a new one
   const [editingItemId, setEditingItemId] = useState(null);
 
-  // Identity extraction from localStorage
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  const artisanId = userInfo?.user?._id || userInfo?.id || "anonymous_artisan";
+  const artisanId = getArtisanId();
 
   // Form State for creating/editing an item
   const [itemForm, setItemForm] = useState({
@@ -42,6 +41,10 @@ export function InventoryPage() {
 
   // GET: Load artisan inventory documents
   const fetchInventory = useCallback(async () => {
+    if (!artisanId) {
+      setItems([]);
+      return;
+    }
     try {
       setGlobalLoading(true);
       const response = await axios.get(API_BASE_URL, {
@@ -58,8 +61,13 @@ export function InventoryPage() {
   }, [artisanId]);
 
   useEffect(() => {
+    if (!artisanId) {
+      alert("Please log in again so inventory can link to your account.");
+      navigate("/login");
+      return;
+    }
     fetchInventory();
-  }, [fetchInventory]);
+  }, [artisanId, fetchInventory, navigate]);
 
   // PUT: Adjust stock dynamically using a delta offset (+1 or -1)
   const updateStock = async (id, amount) => {
@@ -70,7 +78,14 @@ export function InventoryPage() {
     );
 
     try {
-      await axios.put(`${API_BASE_URL}/${id}/stock`, { amount });
+      const userInfo = JSON.parse(localStorage.getItem("userInfo") || "null");
+      await axios.put(
+        `${API_BASE_URL}/${id}/stock`,
+        { amount },
+        userInfo?.token
+          ? { headers: { Authorization: `Bearer ${userInfo.token}` } }
+          : undefined,
+      );
     } catch (error) {
       console.error("Backend sync rejection:", error);
       alert("Failed to synchronize quantity update to database.");
@@ -102,17 +117,27 @@ export function InventoryPage() {
   // POST / PUT: Handles submission for both creating and modifying a document
   const handleSaveItem = async () => {
     if (!itemForm.name.trim()) return alert("Item name is required!");
+    if (!artisanId) return alert("Please log in again before saving inventory.");
 
     try {
       setGlobalLoading(true);
+      const userInfo = JSON.parse(localStorage.getItem("userInfo") || "null");
+      const authHeaders = userInfo?.token
+        ? { headers: { Authorization: `Bearer ${userInfo.token}` } }
+        : undefined;
+
       if (editingItemId) {
-        // PUT: Update complete object attributes
-        const response = await axios.put(`${API_BASE_URL}/${editingItemId}`, itemForm);
+        // PUT: Update complete object attributes (also re-link to current artisan)
+        const response = await axios.put(
+          `${API_BASE_URL}/${editingItemId}`,
+          { ...itemForm, artisanId },
+          authHeaders,
+        );
         setItems((prev) => prev.map((item) => (item._id === editingItemId ? response.data : item)));
       } else {
         // POST: Add new entry
         const payload = { artisanId, ...itemForm };
-        const response = await axios.post(API_BASE_URL, payload);
+        const response = await axios.post(API_BASE_URL, payload, authHeaders);
         setItems([response.data, ...items]);
       }
       close();

@@ -25,7 +25,11 @@ router.post("/", async (req, res, next) => {
     const newItem = new Inventory(req.body);
     const savedItem = await newItem.save();
     // Alert if created already below 20%
-    maybeSendLowStockAlert({ previousItem: null, updatedItem: savedItem });
+    maybeSendLowStockAlert({
+      previousItem: null,
+      updatedItem: savedItem,
+      authHeader: req.headers.authorization,
+    });
     return res.status(201).json(savedItem);
   } catch (error) {
     next(error);
@@ -58,7 +62,11 @@ router.put("/:id/stock", async (req, res, next) => {
       await updatedItem.save();
     }
 
-    maybeSendLowStockAlert({ previousItem, updatedItem });
+    maybeSendLowStockAlert({
+      previousItem,
+      updatedItem,
+      authHeader: req.headers.authorization,
+    });
 
     return res.json(updatedItem);
   } catch (error) {
@@ -85,7 +93,11 @@ router.put("/:id", async (req, res, next) => {
       { new: true, runValidators: true },
     );
 
-    maybeSendLowStockAlert({ previousItem, updatedItem });
+    maybeSendLowStockAlert({
+      previousItem,
+      updatedItem,
+      authHeader: req.headers.authorization,
+    });
 
     return res.json(updatedItem);
   } catch (error) {

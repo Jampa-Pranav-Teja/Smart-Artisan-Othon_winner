@@ -11,6 +11,7 @@ import { useDisclosure } from "@mantine/hooks";
 import axios from "axios";
 
 import { API_BASE } from "../api/config";
+import { getArtisanId } from "../utils/artisanId";
 
 const API_BASE_URL = `${API_BASE}/orders`;
 
@@ -24,9 +25,7 @@ export function MoneyFlow() {
   const [globalLoading, setGlobalLoading] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Safely extract the logged-in artisan's MongoDB ID
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  const artisanId = userInfo?.user?._id || userInfo?.id || "anonymous_artisan";
+  const artisanId = getArtisanId();
 
   // Form State: Add New Order
   const [newOrder, setNewOrder] = useState({
@@ -42,6 +41,7 @@ export function MoneyFlow() {
 
   // FETCH: Get user-scoped orders from MongoDB
   const fetchOrdersFromDb = useCallback(async () => {
+    if (!artisanId) return;
     try {
       setGlobalLoading(true);
       const response = await axios.get(API_BASE_URL, {
