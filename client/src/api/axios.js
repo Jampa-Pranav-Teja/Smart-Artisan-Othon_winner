@@ -6,10 +6,16 @@ const API = axios.create({
 });
 
 API.interceptors.request.use((req) => {
-  const userInfo = localStorage.getItem("userInfo");
-
-  if (userInfo) {
-    req.headers.Authorization = `Bearer ${JSON.parse(userInfo).token}`;
+  try {
+    const raw = localStorage.getItem("userInfo");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.token) {
+        req.headers.Authorization = `Bearer ${parsed.token}`;
+      }
+    }
+  } catch {
+    /* ignore bad session JSON */
   }
 
   return req;

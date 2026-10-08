@@ -8,12 +8,9 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useDisclosure } from "@mantine/hooks";
-import axios from "axios";
 
-import { API_BASE } from "../api/config";
+import API from "../api/axios";
 import { getArtisanId } from "../utils/artisanId";
-
-const API_BASE_URL = `${API_BASE}/inventory`;
 
 export function InventoryPage() {
   const navigate = useNavigate();
@@ -41,15 +38,9 @@ export function InventoryPage() {
 
   // GET: Load artisan inventory documents
   const fetchInventory = useCallback(async () => {
-    if (!artisanId) {
-      setItems([]);
-      return;
-    }
     try {
       setGlobalLoading(true);
-      const response = await axios.get(API_BASE_URL, {
-        params: { artisanId }
-      });
+      const response = await API.get("/inventory");
       if (Array.isArray(response.data)) {
         setItems(response.data);
       }
@@ -58,7 +49,7 @@ export function InventoryPage() {
     } finally {
       setGlobalLoading(false);
     }
-  }, [artisanId]);
+  }, []);
 
   useEffect(() => {
     if (!artisanId) {
@@ -78,14 +69,7 @@ export function InventoryPage() {
     );
 
     try {
-      const userInfo = JSON.parse(localStorage.getItem("userInfo") || "null");
-      await axios.put(
-        `${API_BASE_URL}/${id}/stock`,
-        { amount },
-        userInfo?.token
-          ? { headers: { Authorization: `Bearer ${userInfo.token}` } }
-          : undefined,
-      );
+      await API.put(`/inventory/${id}/stock`, { amount });
     } catch (error) {
       console.error("Backend sync rejection:", error);
       alert("Failed to synchronize quantity update to database.");
@@ -121,23 +105,12 @@ export function InventoryPage() {
 
     try {
       setGlobalLoading(true);
-      const userInfo = JSON.parse(localStorage.getItem("userInfo") || "null");
-      const authHeaders = userInfo?.token
-        ? { headers: { Authorization: `Bearer ${userInfo.token}` } }
-        : undefined;
 
       if (editingItemId) {
-        // PUT: Update complete object attributes (also re-link to current artisan)
-        const response = await axios.put(
-          `${API_BASE_URL}/${editingItemId}`,
-          { ...itemForm, artisanId },
-          authHeaders,
-        );
+        const response = await API.put(`/inventory/${editingItemId}`, itemForm);
         setItems((prev) => prev.map((item) => (item._id === editingItemId ? response.data : item)));
       } else {
-        // POST: Add new entry
-        const payload = { artisanId, ...itemForm };
-        const response = await axios.post(API_BASE_URL, payload, authHeaders);
+        const response = await API.post("/inventory", itemForm);
         setItems([response.data, ...items]);
       }
       close();
@@ -155,7 +128,7 @@ export function InventoryPage() {
 
     try {
       setGlobalLoading(true);
-      await axios.delete(`${API_BASE_URL}/${id}`);
+      await API.delete(`/inventory/${id}`);
       setItems((prev) => prev.filter((item) => item._id !== id));
     } catch (error) {
       console.error("Error dropping inventory document:", error);

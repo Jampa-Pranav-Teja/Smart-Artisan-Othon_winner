@@ -68,7 +68,7 @@ const loginUser = async (req, res) => {
 /* GET PROFILE */
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id || req.user).select("-password");
+    const user = await User.findById(req.user._id || req.user.id || req.user).select("-password");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -83,7 +83,7 @@ const getUserProfile = async (req, res) => {
 /* UPDATE PROFILE */
 const updateUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id || req.user);
+    const user = await User.findById(req.user._id || req.user.id || req.user);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });

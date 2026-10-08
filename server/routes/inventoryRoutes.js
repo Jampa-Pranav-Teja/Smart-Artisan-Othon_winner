@@ -2,16 +2,27 @@ import express from "express";
 import mongoose from "mongoose";
 import Inventory from "../models/Inventory.js";
 import { maybeSendLowStockAlert } from "../utils/lowStockAlert.js";
+import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// 1. GET: Fetch user-scoped items
+function artisanIdFromUser(user) {
+  return String(user._id || user);
+}
+
+// All inventory actions are scoped to the logged-in artisan
+router.use(protect);
+
+// 1. GET: Fetch this artisan's items (also claim leftover anonymous rows)
 router.get("/", async (req, res, next) => {
   try {
-    const { artisanId } = req.query;
-    if (!artisanId) {
-      return res.status(400).json({ message: "Missing artisanId query parameter" });
-    }
+    const artisanId = artisanIdFromUser(req.user);
+
+    await Inventory.updateMany(
+      { artisanId: { $in: ["anonymous_artisan", "", null] } },
+      { $set: { artisanId } },
+    );
+
     const items = await Inventory.find({ artisanId }).sort({ createdAt: -1 });
     return res.json(items);
   } catch (error) {
@@ -19,16 +30,16 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// 2. POST: Insert a brand new record
+// 2. POST: Insert a brand new record owned by the logged-in artisan
 router.post("/", async (req, res, next) => {
   try {
-    const newItem = new Inventory(req.body);
+    const artisanId = artisanIdFromUser(req.user);
+    const newItem = new Inventory({ ...req.body, artisanId });
     const savedItem = await newItem.save();
-    // Alert if created already below 20%
     maybeSendLowStockAlert({
       previousItem: null,
       updatedItem: savedItem,
-      authHeader: req.headers.authorization,
+      user: req.user,
     });
     return res.status(201).json(savedItem);
   } catch (error) {
@@ -40,7 +51,8 @@ router.post("/", async (req, res, next) => {
 router.put("/:id/stock", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { amount } = req.body; // Expects 1 or -1
+    const { amount } = req.body;
+    const artisanId = artisanIdFromUser(req.user);
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid MongoDB Object ID configuration" });
@@ -53,7 +65,10 @@ router.put("/:id/stock", async (req, res, next) => {
 
     let updatedItem = await Inventory.findByIdAndUpdate(
       id,
-      { $inc: { stock: amount } },
+      {
+        $inc: { stock: amount },
+        $set: { artisanId },
+      },
       { new: true, runValidators: true },
     );
 
@@ -65,7 +80,7 @@ router.put("/:id/stock", async (req, res, next) => {
     maybeSendLowStockAlert({
       previousItem,
       updatedItem,
-      authHeader: req.headers.authorization,
+      user: req.user,
     });
 
     return res.json(updatedItem);
@@ -78,6 +93,8 @@ router.put("/:id/stock", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
+    const artisanId = artisanIdFromUser(req.user);
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid MongoDB Object ID configuration" });
     }
@@ -87,16 +104,17 @@ router.put("/:id", async (req, res, next) => {
       return res.status(404).json({ message: "Target inventory row not found" });
     }
 
+    const { artisanId: _ignored, ...rest } = req.body;
     const updatedItem = await Inventory.findByIdAndUpdate(
       id,
-      { $set: req.body },
+      { $set: { ...rest, artisanId } },
       { new: true, runValidators: true },
     );
 
     maybeSendLowStockAlert({
       previousItem,
       updatedItem,
-      authHeader: req.headers.authorization,
+      user: req.user,
     });
 
     return res.json(updatedItem);
