@@ -87,13 +87,29 @@ export function PriceAnalyser() {
         timeout: 120000,
       });
 
-      const data = response.data;
+      const data = response.data || {};
+      const raw = data.raw || data;
       setPrediction({
-        classification: data.classification || "AI Classification Result",
-        suggestedRange: data.price_range_text || "Evaluated in INR",
-        matchStatus: data.match_status || null,
-        currency: data.currency || "INR",
-        details: data.details || "No analysis text returned.",
+        classification:
+          data.classification ||
+          raw.classification ||
+          data.item ||
+          "AI Classification Result",
+        suggestedRange:
+          data.price_range_text ||
+          raw.price_range_text ||
+          data.suggestedRange ||
+          (raw.min_price != null && raw.max_price != null
+            ? `₹${raw.min_price} - ₹${raw.max_price}`
+            : null) ||
+          "Evaluated in INR",
+        matchStatus: data.match_status || raw.match_status || null,
+        currency: data.currency || raw.currency || "INR",
+        details:
+          data.details ||
+          raw.details ||
+          data.reasoning ||
+          "No analysis text returned.",
       });
     } catch (error) {
       console.error("n8n workflow connection error:", error);
