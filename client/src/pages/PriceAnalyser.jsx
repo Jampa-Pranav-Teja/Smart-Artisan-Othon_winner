@@ -89,13 +89,11 @@ export function PriceAnalyser() {
 
       const data = response.data;
       setPrediction({
-        item: data.item || "AI Classification Result",
-        suggestedRange: data.suggestedRange || "Evaluated in INR",
-        confidence:
-          typeof data.confidence === "number"
-            ? `${data.confidence}%`
-            : String(data.confidence || "—"),
-        reasoning: data.reasoning || "No analysis text returned.",
+        classification: data.classification || "AI Classification Result",
+        suggestedRange: data.price_range_text || "Evaluated in INR",
+        matchStatus: data.match_status || null,
+        currency: data.currency || "INR",
+        details: data.details || "No analysis text returned.",
       });
     } catch (error) {
       console.error("n8n workflow connection error:", error);
@@ -214,18 +212,33 @@ export function PriceAnalyser() {
                 <Text size="sm" fw={700} c="dimmed">
                   PREDICTION RESULT
                 </Text>
-                <Badge color="green">{prediction.confidence} Match</Badge>
+                {prediction.matchStatus && (
+                  <Badge
+                    color={
+                      String(prediction.matchStatus).toUpperCase() === "MATCH"
+                        ? "green"
+                        : "orange"
+                    }
+                  >
+                    {prediction.matchStatus}
+                  </Badge>
+                )}
               </Group>
-              <Title order={4}>{prediction.item}</Title>
+              <Title order={4}>{prediction.classification}</Title>
               <Divider />
-              <Group justify="space-between">
+              <Group justify="space-between" align="flex-start">
                 <Text fw={600}>Market Price Range:</Text>
-                <Text size="xl" fw={900} c="orange">
-                  {prediction.suggestedRange}
-                </Text>
+                <Stack gap={0} align="flex-end">
+                  <Text size="xl" fw={900} c="orange">
+                    {prediction.suggestedRange}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {prediction.currency}
+                  </Text>
+                </Stack>
               </Group>
               <Alert icon={<IconInfoCircle size={16} />} color="blue" radius="md">
-                {prediction.reasoning}
+                {prediction.details}
               </Alert>
               <Button
                 fullWidth

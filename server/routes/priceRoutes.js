@@ -10,7 +10,7 @@ const upload = multer({
 });
 
 const DEFAULT_N8N_PRICE_URL =
-  "https://n8n.srv1710717.hstgr.cloud/webhook-test/4907eca7-65ca-41d2-a128-f345821b73ac";
+  "https://n8n.srv1710717.hstgr.cloud/webhook/4907eca7-65ca-41d2-a128-f345821b73ac";
 
 function unwrapPayload(responseData) {
   let candidate = responseData;
@@ -90,22 +90,33 @@ router.post("/analyze", upload.single("image"), async (req, res) => {
 
     const payload = unwrapPayload(n8nResponse.data);
 
-    // Pass through structured fields when present; keep raw output for free-text workflows
+    // n8n schema:
+    // classification, min_price, max_price, price_range_text, currency, match_status, details
+    const priceRangeText =
+      payload.price_range_text ||
+      (payload.min_price != null && payload.max_price != null
+        ? `₹${payload.min_price} - ₹${payload.max_price}`
+        : null);
+
     return res.json({
-      item: payload.item || payload.product || payload.name || "AI Classification Result",
-      suggestedRange:
-        payload.suggestedRange ||
-        payload.price_range ||
-        payload.priceRange ||
-        payload.price ||
-        "Evaluated in INR",
-      confidence: payload.confidence || payload.confidence_score || "—",
-      reasoning:
+      classification:
+        payload.classification ||
+        payload.item ||
+        payload.product ||
+        payload.name ||
+        "AI Classification Result",
+      min_price: payload.min_price ?? null,
+      max_price: payload.max_price ?? null,
+      price_range_text: priceRangeText || "Evaluated in INR",
+      currency: payload.currency || "INR",
+      match_status: payload.match_status || null,
+      details:
+        payload.details ||
         payload.reasoning ||
         payload.output ||
         payload.analysis ||
         payload.description ||
-        JSON.stringify(payload),
+        "No analysis text returned.",
       raw: payload,
     });
   } catch (error) {

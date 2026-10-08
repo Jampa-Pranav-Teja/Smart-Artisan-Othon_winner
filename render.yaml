@@ -19,4 +19,4 @@ services:
       - key: N8N_QC_WEBHOOK_URL
         value: https://n8n.srv1710717.hstgr.cloud/webhook/48fd30e2-86e0-4bc8-b483-a0f961d2d144
       - key: N8N_PRICE_WEBHOOK_URL
-        value: https://n8n.srv1710717.hstgr.cloud/webhook-test/4907eca7-65ca-41d2-a128-f345821b73ac
+        value: https://n8n.srv1710717.hstgr.cloud/webhook/4907eca7-65ca-41d2-a128-f345821b73ac
