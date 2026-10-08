@@ -124,7 +124,7 @@ const updateUserProfile = async (req, res) => {
 };
 
 const DEFAULT_N8N_TELEGRAM_WEBHOOK =
-  "https://n8n.srv1710717.hstgr.cloud/webhook/c002b8f1-a120-48d0-b526-1aafabbb54a1";
+  "https://n8n.srv1710717.hstgr.cloud/webhook-test/c002b8f1-a120-48d0-b526-1aafabbb54a1";
 
 async function telegramApi(botToken, method, payload) {
   return axios.post(
@@ -169,11 +169,10 @@ const connectTelegramWebhook = async (req, res) => {
     const n8nBase =
       process.env.N8N_TELEGRAM_WEBHOOK_URL || DEFAULT_N8N_TELEGRAM_WEBHOOK;
 
-    const n8nWebhookUrl = new URL(n8nBase.replace("/webhook-test/", "/webhook/"));
+    const n8nWebhookUrl = new URL(n8nBase);
     n8nWebhookUrl.searchParams.set("bot_token", botToken);
     n8nWebhookUrl.searchParams.set("artisan_id", artisanId);
 
-    // Clear any previous webhook, then register the n8n production URL.
     await telegramApi(botToken, "deleteWebhook", {
       drop_pending_updates: true,
     });
@@ -192,23 +191,16 @@ const connectTelegramWebhook = async (req, res) => {
         message:
           telegramResponse.data?.description ||
           webhookInfo.last_error_message ||
-          "Telegram rejected the webhook. Activate the n8n workflow, then try again.",
+          "Telegram rejected the webhook. Click Execute workflow in n8n first, then connect again.",
         telegram: telegramResponse.data,
-        webhookInfo,
-      });
-    }
-
-    if (webhookInfo.last_error_message) {
-      return res.status(502).json({
-        message: `Webhook set, but Telegram reported: ${webhookInfo.last_error_message}. Turn the n8n workflow Active (production URL, not test).`,
-        webhookUrl: n8nWebhookUrl.toString(),
         webhookInfo,
       });
     }
 
     return res.json({
       success: true,
-      message: "Telegram bot connected. Send the bot a message to test.",
+      message:
+        "Telegram bot connected to the n8n test webhook. Click Execute workflow in n8n, then send the bot a message.",
       artisanId,
       webhookUrl: n8nWebhookUrl.toString(),
       telegram: telegramResponse.data,
